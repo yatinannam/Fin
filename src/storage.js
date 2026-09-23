@@ -32,32 +32,68 @@ async function getUnallocated() {
   return 0;
 }
 
-async function setUnallocated(amount) {
+// `inTransaction` (default false) signals that the caller has already opened
+// an explicit db.beginTransaction()/commitTransaction() pair. When true, the
+// inner db.run() calls are told not to auto-wrap themselves in their own
+// transaction (transaction=false), so they participate in the caller's
+// transaction instead of each auto-committing independently.
+async function setUnallocated(amount, inTransaction) {
   var rounded = round2(amount);
   var existing = await db.query('SELECT key FROM meta WHERE key = ?', ['unallocated']);
+  var selfCommit = !inTransaction;
   if (existing.values && existing.values.length > 0) {
-    await db.run('UPDATE meta SET value = ? WHERE key = ?', [String(rounded), 'unallocated']);
+    await db.run('UPDATE meta SET value = ? WHERE key = ?', [String(rounded), 'unallocated'], selfCommit);
   } else {
-    await db.run('INSERT INTO meta (key, value) VALUES (?, ?)', ['unallocated', String(rounded)]);
+    await db.run('INSERT INTO meta (key, value) VALUES (?, ?)', ['unallocated', String(rounded)], selfCommit);
   }
 }
 
-async function addTx(type, amount, title, sub, envelopeId) {
+async function addTx(type, amount, title, sub, envelopeId, inTransaction) {
   await db.run(
     'INSERT INTO transactions (id, type, amount, title, sub, envelope_id, ts) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [uid(), type, amount, title, sub || '', envelopeId || null, new Date().toISOString()]
+    [uid(), type, amount, title, sub || '', envelopeId || null, new Date().toISOString()],
+    !inTransaction
   );
+}
+
+// Wraps `fn` (which must perform only db.run() writes, each passing
+// transaction:false / inTransaction:true) in an explicit SQLite transaction.
+// On any failure, rolls back and rethrows so callers see the original error.
+async function withTransaction(fn) {
+  await db.beginTransaction();
+  try {
+    var result = await fn();
+    await db.commitTransaction();
+    return result;
+  } catch (e) {
+    try {
+      await db.rollbackTransaction();
+    } catch (rollbackErr) {
+      console.error('Rollback failed', rollbackErr);
+    }
+    throw e;
+  }
 }
 
 export var Storage = {
   async init() {
+    // Reconcile the JS-side connection map against the native plugin's own
+    // connection registry first. If the WebView reloaded but the native
+    // connection survived, this JS-side map is empty even though native
+    // still holds it open; checkConnectionsConsistency() detects that and
+    // has native close its stale connections so createConnection() below
+    // won't be rejected as a duplicate.
+    await sqliteConnection.checkConnectionsConsistency();
     var isConnResult = await sqliteConnection.isConnection(DB_NAME, false);
     if (isConnResult.result) {
       db = await sqliteConnection.retrieveConnection(DB_NAME, false);
     } else {
       db = await sqliteConnection.createConnection(DB_NAME, false, 'no-encryption', 1, false);
     }
-    await db.open();
+    var isOpenResult = await db.isDBOpen();
+    if (!isOpenResult.result) {
+      await db.open();
+    }
     await ensureSchema();
     var existing = await db.query('SELECT value FROM meta WHERE key = ?', ['unallocated']);
     if (!existing.values || existing.values.length === 0) {
@@ -83,8 +119,10 @@ export var Storage = {
   async addIncome(amount, note) {
     var unallocated = await getUnallocated();
     var amt = round2(amount);
-    await setUnallocated(unallocated + amt);
-    await addTx('income', amt, note || 'Money added', '');
+    await withTransaction(async function() {
+      await setUnallocated(unallocated + amt, true);
+      await addTx('income', amt, note || 'Money added', '', null, true);
+    });
     return this.getState();
   },
 
@@ -95,14 +133,17 @@ export var Storage = {
       throw new Error('Not enough unallocated money');
     }
     var id = uid();
-    await db.run(
-      'INSERT INTO envelopes (id, name, allocated, spent) VALUES (?, ?, ?, 0)',
-      [id, name, initialAmt]
-    );
-    await setUnallocated(unallocated - initialAmt);
-    if (initialAmt > 0) {
-      await addTx('allocate', initialAmt, 'Allocated to ' + name, '', id);
-    }
+    await withTransaction(async function() {
+      await db.run(
+        'INSERT INTO envelopes (id, name, allocated, spent) VALUES (?, ?, ?, 0)',
+        [id, name, initialAmt],
+        false
+      );
+      await setUnallocated(unallocated - initialAmt, true);
+      if (initialAmt > 0) {
+        await addTx('allocate', initialAmt, 'Allocated to ' + name, '', id, true);
+      }
+    });
     return this.getState();
   },
 
@@ -114,8 +155,10 @@ export var Storage = {
     var env = envRes.values[0];
     var amt = round2(amount);
     var newSpent = round2(env.spent + amt);
-    await db.run('UPDATE envelopes SET spent = ? WHERE id = ?', [newSpent, envelopeId]);
-    await addTx('expense', amt, note || ('Spent from ' + env.name), env.name, envelopeId);
+    await withTransaction(async function() {
+      await db.run('UPDATE envelopes SET spent = ? WHERE id = ?', [newSpent, envelopeId], false);
+      await addTx('expense', amt, note || ('Spent from ' + env.name), env.name, envelopeId, true);
+    });
     return this.getState();
   },
 
@@ -131,9 +174,11 @@ export var Storage = {
     }
     var env = envRes.values[0];
     var newAllocated = round2(env.allocated + amt);
-    await db.run('UPDATE envelopes SET allocated = ? WHERE id = ?', [newAllocated, envelopeId]);
-    await setUnallocated(unallocated - amt);
-    await addTx('allocate', amt, 'Allocated to ' + env.name, '', envelopeId);
+    await withTransaction(async function() {
+      await db.run('UPDATE envelopes SET allocated = ? WHERE id = ?', [newAllocated, envelopeId], false);
+      await setUnallocated(unallocated - amt, true);
+      await addTx('allocate', amt, 'Allocated to ' + env.name, '', envelopeId, true);
+    });
     return this.getState();
   },
 
@@ -145,16 +190,20 @@ export var Storage = {
     var env = envRes.values[0];
     var remaining = round2(env.allocated - env.spent);
     var unallocated = await getUnallocated();
-    await setUnallocated(unallocated + remaining);
-    await db.run('DELETE FROM envelopes WHERE id = ?', [envelopeId]);
-    await addTx('move', remaining, 'Deleted ' + env.name, 'Balance returned');
+    await withTransaction(async function() {
+      await setUnallocated(unallocated + remaining, true);
+      await db.run('DELETE FROM envelopes WHERE id = ?', [envelopeId], false);
+      await addTx('move', remaining, 'Deleted ' + env.name, 'Balance returned', null, true);
+    });
     return this.getState();
   },
 
   async reset() {
-    await db.run('DELETE FROM envelopes');
-    await db.run('DELETE FROM transactions');
-    await setUnallocated(0);
+    await withTransaction(async function() {
+      await db.run('DELETE FROM envelopes', [], false);
+      await db.run('DELETE FROM transactions', [], false);
+      await setUnallocated(0, true);
+    });
     return this.getState();
   },
 

@@ -3,6 +3,7 @@ import { Export } from './export.js';
 
 var state = null;
 var activeDetailId = null;
+var actionInFlight = false;
 
 function fmt(n) {
   n = Math.round(n * 100) / 100;
@@ -24,14 +25,24 @@ function showFatalError(e) {
   document.getElementById('fatalError').classList.remove('hidden');
 }
 
-function showExportStatus(msg) {
+// Generic visible-message banner, shared by export status and by any
+// action's failure feedback (e.g. an unexpected DB error on an
+// income/expense/reset action) so the user always sees SOMETHING instead of
+// a silently stuck button.
+function showMessage(msg) {
   var el = document.getElementById('exportStatus');
   el.textContent = msg;
   el.classList.remove('hidden');
 }
 
-function hideExportStatus() {
+function hideMessage() {
   document.getElementById('exportStatus').classList.add('hidden');
+}
+
+var VALIDATION_ERROR_MESSAGE = 'Not enough unallocated money';
+
+function genericFailureMessage(e) {
+  return 'Something went wrong: ' + (e && e.message ? e.message : e);
 }
 
 function render() {
@@ -123,15 +134,26 @@ document.getElementById('openAddIncome').addEventListener('click', function() {
 });
 document.getElementById('incomeCancel').addEventListener('click', function() { hideOverlay('incomeOverlay'); });
 document.getElementById('incomeConfirm').addEventListener('click', async function() {
-  var amt = parseFloat(document.getElementById('incomeAmount').value);
-  if (!amt || amt <= 0) {
-    document.getElementById('incomeError').style.display = 'block';
-    return;
+  if (actionInFlight) return;
+  actionInFlight = true;
+  try {
+    var amt = parseFloat(document.getElementById('incomeAmount').value);
+    if (!amt || amt <= 0) {
+      document.getElementById('incomeError').style.display = 'block';
+      return;
+    }
+    var note = document.getElementById('incomeNote').value.trim();
+    try {
+      state = await Storage.addIncome(amt, note);
+    } catch (e) {
+      showMessage(genericFailureMessage(e));
+      return;
+    }
+    hideOverlay('incomeOverlay');
+    render();
+  } finally {
+    actionInFlight = false;
   }
-  var note = document.getElementById('incomeNote').value.trim();
-  state = await Storage.addIncome(amt, note);
-  hideOverlay('incomeOverlay');
-  render();
 });
 
 document.getElementById('openAddEnvelope').addEventListener('click', function() {
@@ -142,20 +164,30 @@ document.getElementById('openAddEnvelope').addEventListener('click', function() 
 });
 document.getElementById('envelopeCancel').addEventListener('click', function() { hideOverlay('envelopeOverlay'); });
 document.getElementById('envelopeConfirm').addEventListener('click', async function() {
-  var name = document.getElementById('envelopeName').value.trim();
-  var initial = parseFloat(document.getElementById('envelopeInitial').value) || 0;
-  if (!name || initial < 0 || initial > state.unallocated) {
-    document.getElementById('envelopeError').style.display = 'block';
-    return;
-  }
+  if (actionInFlight) return;
+  actionInFlight = true;
   try {
-    state = await Storage.addEnvelope(name, initial);
-  } catch (e) {
-    document.getElementById('envelopeError').style.display = 'block';
-    return;
+    var name = document.getElementById('envelopeName').value.trim();
+    var initial = parseFloat(document.getElementById('envelopeInitial').value) || 0;
+    if (!name || initial < 0 || initial > state.unallocated) {
+      document.getElementById('envelopeError').style.display = 'block';
+      return;
+    }
+    try {
+      state = await Storage.addEnvelope(name, initial);
+    } catch (e) {
+      if (e && e.message === VALIDATION_ERROR_MESSAGE) {
+        document.getElementById('envelopeError').style.display = 'block';
+      } else {
+        showMessage(genericFailureMessage(e));
+      }
+      return;
+    }
+    hideOverlay('envelopeOverlay');
+    render();
+  } finally {
+    actionInFlight = false;
   }
-  hideOverlay('envelopeOverlay');
-  render();
 });
 
 document.getElementById('openLogExpense').addEventListener('click', function() {
@@ -167,17 +199,28 @@ document.getElementById('openLogExpense').addEventListener('click', function() {
 });
 document.getElementById('expenseCancel').addEventListener('click', function() { hideOverlay('expenseOverlay'); });
 document.getElementById('expenseConfirm').addEventListener('click', async function() {
-  var catId = document.getElementById('expenseEnvelope').value;
-  var amt = parseFloat(document.getElementById('expenseAmount').value);
-  var cat = state.categories.filter(function(c) { return c.id === catId; })[0];
-  if (!cat || !amt || amt <= 0) {
-    document.getElementById('expenseError').style.display = 'block';
-    return;
+  if (actionInFlight) return;
+  actionInFlight = true;
+  try {
+    var catId = document.getElementById('expenseEnvelope').value;
+    var amt = parseFloat(document.getElementById('expenseAmount').value);
+    var cat = state.categories.filter(function(c) { return c.id === catId; })[0];
+    if (!cat || !amt || amt <= 0) {
+      document.getElementById('expenseError').style.display = 'block';
+      return;
+    }
+    var note = document.getElementById('expenseNote').value.trim();
+    try {
+      state = await Storage.logExpense(catId, amt, note);
+    } catch (e) {
+      showMessage(genericFailureMessage(e));
+      return;
+    }
+    hideOverlay('expenseOverlay');
+    render();
+  } finally {
+    actionInFlight = false;
   }
-  var note = document.getElementById('expenseNote').value.trim();
-  state = await Storage.logExpense(catId, amt, note);
-  hideOverlay('expenseOverlay');
-  render();
 });
 
 function openDetail(id) {
@@ -191,44 +234,80 @@ function openDetail(id) {
 }
 document.getElementById('detailClose').addEventListener('click', function() { hideOverlay('detailOverlay'); });
 document.getElementById('detailAllocateConfirm').addEventListener('click', async function() {
-  var cat = state.categories.filter(function(c) { return c.id === activeDetailId; })[0];
-  var amt = parseFloat(document.getElementById('detailAllocate').value);
-  if (!cat || !amt || amt <= 0 || amt > state.unallocated) {
-    document.getElementById('detailError').style.display = 'block';
-    return;
-  }
+  if (actionInFlight) return;
+  actionInFlight = true;
   try {
-    state = await Storage.allocateMore(activeDetailId, amt);
-  } catch (e) {
-    document.getElementById('detailError').style.display = 'block';
-    return;
+    var cat = state.categories.filter(function(c) { return c.id === activeDetailId; })[0];
+    var amt = parseFloat(document.getElementById('detailAllocate').value);
+    if (!cat || !amt || amt <= 0 || amt > state.unallocated) {
+      document.getElementById('detailError').style.display = 'block';
+      return;
+    }
+    try {
+      state = await Storage.allocateMore(activeDetailId, amt);
+    } catch (e) {
+      if (e && e.message === VALIDATION_ERROR_MESSAGE) {
+        document.getElementById('detailError').style.display = 'block';
+      } else {
+        showMessage(genericFailureMessage(e));
+      }
+      return;
+    }
+    hideOverlay('detailOverlay');
+    render();
+  } finally {
+    actionInFlight = false;
   }
-  hideOverlay('detailOverlay');
-  render();
 });
 document.getElementById('detailDelete').addEventListener('click', async function() {
-  var cat = state.categories.filter(function(c) { return c.id === activeDetailId; })[0];
-  if (!cat) return;
-  if (!confirm('Delete "' + cat.name + '"? Its remaining balance goes back to unallocated.')) return;
-  state = await Storage.deleteEnvelope(activeDetailId);
-  hideOverlay('detailOverlay');
-  render();
+  if (actionInFlight) return;
+  actionInFlight = true;
+  try {
+    var cat = state.categories.filter(function(c) { return c.id === activeDetailId; })[0];
+    if (!cat) return;
+    if (!confirm('Delete "' + cat.name + '"? Its remaining balance goes back to unallocated.')) return;
+    try {
+      state = await Storage.deleteEnvelope(activeDetailId);
+    } catch (e) {
+      showMessage(genericFailureMessage(e));
+      return;
+    }
+    hideOverlay('detailOverlay');
+    render();
+  } finally {
+    actionInFlight = false;
+  }
 });
 
 document.getElementById('resetBtn').addEventListener('click', async function() {
-  if (!confirm('Clear all data and start over? This cannot be undone.')) return;
-  state = await Storage.reset();
-  render();
+  if (actionInFlight) return;
+  actionInFlight = true;
+  try {
+    if (!confirm('Clear all data and start over? This cannot be undone.')) return;
+    try {
+      state = await Storage.reset();
+    } catch (e) {
+      showMessage(genericFailureMessage(e));
+      return;
+    }
+    render();
+  } finally {
+    actionInFlight = false;
+  }
 });
 
 document.getElementById('exportBtn').addEventListener('click', async function() {
-  hideExportStatus();
+  if (actionInFlight) return;
+  actionInFlight = true;
+  hideMessage();
   try {
     var rows = await Storage.getAllTransactionsForExport();
     await Export.exportCsv(rows);
   } catch (e) {
     console.error('Export failed', e);
-    showExportStatus('Could not export: ' + (e && e.message ? e.message : e));
+    showMessage('Could not export: ' + (e && e.message ? e.message : e));
+  } finally {
+    actionInFlight = false;
   }
 });
 
