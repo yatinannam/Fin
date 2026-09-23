@@ -1,4 +1,5 @@
 import { Storage } from './storage.js';
+import { Export } from './export.js';
 
 var state = null;
 var activeDetailId = null;
@@ -21,6 +22,16 @@ function showFatalError(e) {
   document.getElementById('loadingScreen').classList.add('hidden');
   document.getElementById('fatalErrorDetail').textContent = e && e.message ? e.message : String(e);
   document.getElementById('fatalError').classList.remove('hidden');
+}
+
+function showExportStatus(msg) {
+  var el = document.getElementById('exportStatus');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+function hideExportStatus() {
+  document.getElementById('exportStatus').classList.add('hidden');
 }
 
 function render() {
@@ -208,6 +219,17 @@ document.getElementById('resetBtn').addEventListener('click', async function() {
   if (!confirm('Clear all data and start over? This cannot be undone.')) return;
   state = await Storage.reset();
   render();
+});
+
+document.getElementById('exportBtn').addEventListener('click', async function() {
+  hideExportStatus();
+  try {
+    var rows = await Storage.getAllTransactionsForExport();
+    await Export.exportCsv(rows);
+  } catch (e) {
+    console.error('Export failed', e);
+    showExportStatus('Could not export: ' + (e && e.message ? e.message : e));
+  }
 });
 
 document.querySelectorAll('.overlay').forEach(function(ov) {

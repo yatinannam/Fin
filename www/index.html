@@ -21,8 +21,12 @@
 <div class="app">
   <header class="top">
     <h1>Flat Ledger</h1>
-    <button class="icon-btn" id="resetBtn">Reset</button>
+    <div class="header-actions">
+      <button class="icon-btn" id="exportBtn">Export</button>
+      <button class="icon-btn" id="resetBtn">Reset</button>
+    </div>
   </header>
+  <div id="exportStatus" class="export-status hidden"></div>
 
   <div class="passbook">
     <div class="label">Unallocated</div>
