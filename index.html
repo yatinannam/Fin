@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    box-sizing: border-box;
+    --paper: #F6F3EC;
+    --paper-raised: #FFFFFF;
+    --ink: #1B2320;
+    --ink-soft: #5B655F;
+    --line: #DAD4C4;
+    --line-strong: #C3BBA5;
+    --green: #2F6F4E;
+    --green-soft: #E4EEE7;
+    --gold: #A9752E;
+    --gold-soft: #F1E7D4;
+    --brick: #A8392F;
+    --brick-soft: #F3E1DE;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14181A;
+      --paper-raised: #1B211F;
+      --ink: #ECEAE2;
+      --ink-soft: #9AA39B;
+      --line: #2C332F;
+      --line-strong: #3B443E;
+      --green: #6FAE87;
+      --green-soft: #1E2C25;
+      --gold: #D3A85C;
+      --gold-soft: #2C2519;
+      --brick: #E08277;
+      --brick-soft: #2E1E1C;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14181A;
+    --paper-raised: #1B211F;
+    --ink: #ECEAE2;
+    --ink-soft: #9AA39B;
+    --line: #2C332F;
+    --line-strong: #3B443E;
+    --green: #6FAE87;
+    --green-soft: #1E2C25;
+    --gold: #D3A85C;
+    --gold-soft: #2C2519;
+    --brick: #E08277;
+    --brick-soft: #2E1E1C;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); height: 100%; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    height: 100%;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100%;
+    padding: 20px 18px 96px;
+    position: relative;
+  }
+  header.top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  header.top h1 {
+    font-family: 'Lora', serif;
+    font-weight: 600;
+    font-size: 22px;
+    margin: 0;
+    letter-spacing: 0.2px;
+  }
+  header.top button.icon-btn {
+    background: none;
+    border: none;
+    color: var(--ink-soft);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 6px;
+  }
+
+  .passbook {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 20px 20px 16px;
+    margin-bottom: 22px;
+  }
+  .passbook .label {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+  .passbook .amount {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 34px;
+    letter-spacing: -0.5px;
+  }
+  .passbook .amount .rupee { font-size: 22px; margin-right: 2px; color: var(--ink-soft); font-weight: 500; }
+  .passbook .sub {
+    display: flex;
+    gap: 20px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--line-strong);
+  }
+  .passbook .sub div { flex: 1; }
+  .passbook .sub .k { font-size: 11px; color: var(--ink-soft); margin-bottom: 2px; }
+  .passbook .sub .v { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 500; }
+
+  .actions-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 26px;
+  }
+  .actions-row button {
+    flex: 1;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 12px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line-strong);
+    background: var(--paper-raised);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .actions-row button.primary {
+    background: var(--green);
+    border-color: var(--green);
+    color: #F6F3EC;
+  }
+
+  section.envelopes h2 {
+    font-family: 'Lora', serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin: 0 0 10px 2px;
+    font-style: italic;
+  }
+  .envelope {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+  }
+  .envelope-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .envelope-top .name {
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .envelope-top .remaining {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .envelope-top .remaining.over { color: var(--brick); }
+  .envelope-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--ink-soft);
+    font-family: 'IBM Plex Mono', monospace;
+    margin-bottom: 8px;
+  }
+  .bar {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--line);
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: var(--gold);
+    border-radius: 3px;
+  }
+  .bar-fill.over { background: var(--brick); }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--ink-soft);
+    font-size: 14px;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius-md);
+  }
+
+  .add-envelope-btn {
+    width: 100%;
+    padding: 12px;
+    margin-top: 4px;
+    background: none;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius-md);
+    color: var(--ink-soft);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  section.history { margin-top: 30px; }
+  section.history h2 {
+    font-family: 'Lora', serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin: 0 0 10px 2px;
+    font-style: italic;
+  }
+  .tx {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 2px;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+  }
+  .tx:last-child { border-bottom: none; }
+  .tx .tx-left .tx-title { font-weight: 500; }
+  .tx .tx-left .tx-sub { color: var(--ink-soft); font-size: 11px; margin-top: 1px; }
+  .tx .tx-amt { font-family: 'IBM Plex Mono', monospace; font-weight: 600; white-space: nowrap; }
+  .tx .tx-amt.in { color: var(--green); }
+  .tx .tx-amt.out { color: var(--brick); }
+  .tx .tx-amt.move { color: var(--ink-soft); }
+
+  /* Modal */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20,24,22,0.45);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 50;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .overlay.show { display: flex; }
+  .sheet {
+    background: var(--paper);
+    width: 100%;
+    max-width: 480px;
+    border-radius: 16px 16px 0 0;
+    padding: 22px 20px 28px;
+    border-top: 1px solid var(--line-strong);
+  }
+  .sheet h3 {
+    font-family: 'Lora', serif;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 16px;
+  }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 5px;
+  }
+  .field input, .field select {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--paper-raised);
+    color: var(--ink);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+  }
+  .field input:focus, .field select:focus {
+    outline: 2px solid var(--green);
+    outline-offset: 1px;
+  }
+  .field.text input, .field.text select { font-family: 'Inter', sans-serif; font-size: 14px; }
+  .sheet-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+  }
+  .sheet-actions button {
+    flex: 1;
+    padding: 13px;
+    border-radius: var(--radius-sm);
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    border: 1px solid var(--line-strong);
+    background: var(--paper-raised);
+    color: var(--ink);
+  }
+  .sheet-actions button.confirm {
+    background: var(--green);
+    border-color: var(--green);
+    color: #F6F3EC;
+  }
+  .sheet-actions button.danger {
+    background: var(--brick);
+    border-color: var(--brick);
+    color: #F6F3EC;
+  }
+  .error-msg {
+    color: var(--brick);
+    font-size: 12px;
+    margin-top: -8px;
+    margin-bottom: 12px;
+    display: none;
+  }
+  .envelope-detail-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .envelope-detail-row button { flex: 1; }
+
+  #loadingScreen {
+    position: fixed;
+    inset: 0;
+    background: var(--paper);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    color: var(--ink-soft);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+  #loadingScreen.hidden { display: none; }
+</style>
+</head>
+<body>
+<div id="loadingScreen">Loading your ledger…</div>
+<div class="app">
+  <header class="top">
+    <h1>Flat Ledger</h1>
+    <button class="icon-btn" id="resetBtn">Reset</button>
+  </header>
+
+  <div class="passbook">
+    <div class="label">Unallocated</div>
+    <div class="amount"><span class="rupee">₹</span><span id="unallocatedAmt">0</span></div>
+    <div class="sub">
+      <div>
+        <div class="k">Allocated</div>
+        <div class="v" id="totalAllocated">₹0</div>
+      </div>
+      <div>
+        <div class="k">Spent</div>
+        <div class="v" id="totalSpent">₹0</div>
+      </div>
+      <div>
+        <div class="k">Remaining overall</div>
+        <div class="v" id="totalIn">₹0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions-row">
+    <button class="primary" id="openAddIncome">+ Add money</button>
+    <button id="openLogExpense">Log expense</button>
+  </div>
+
+  <section class="envelopes">
+    <h2>Envelopes</h2>
+    <div id="envelopeList"></div>
+    <button class="add-envelope-btn" id="openAddEnvelope">+ New envelope</button>
+  </section>
+
+  <section class="history">
+    <h2>Recent activity</h2>
+    <div id="historyList"></div>
+  </section>
+</div>
+
+<!-- Add Income Sheet -->
+<div class="overlay" id="incomeOverlay">
+  <div class="sheet">
+    <h3>Add money</h3>
+    <div class="field">
+      <label>Amount (₹)</label>
+      <input type="number" id="incomeAmount" inputmode="decimal" placeholder="0">
+    </div>
+    <div class="field text">
+      <label>Note (optional)</label>
+      <input type="text" id="incomeNote" placeholder="e.g. Monthly allowance">
+    </div>
+    <div class="error-msg" id="incomeError">Enter an amount greater than 0.</div>
+    <div class="sheet-actions">
+      <button id="incomeCancel">Cancel</button>
+      <button class="confirm" id="incomeConfirm">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Envelope Sheet -->
+<div class="overlay" id="envelopeOverlay">
+  <div class="sheet">
+    <h3>New envelope</h3>
+    <div class="field text">
+      <label>Name</label>
+      <input type="text" id="envelopeName" placeholder="e.g. Rent, Wifi, Groceries">
+    </div>
+    <div class="field">
+      <label>Allocate now (optional, ₹)</label>
+      <input type="number" id="envelopeInitial" inputmode="decimal" placeholder="0">
+    </div>
+    <div class="error-msg" id="envelopeError">Give it a name, and don't allocate more than you have unallocated.</div>
+    <div class="sheet-actions">
+      <button id="envelopeCancel">Cancel</button>
+      <button class="confirm" id="envelopeConfirm">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Log Expense Sheet -->
+<div class="overlay" id="expenseOverlay">
+  <div class="sheet">
+    <h3>Log expense</h3>
+    <div class="field text">
+      <label>Envelope</label>
+      <select id="expenseEnvelope"></select>
+    </div>
+    <div class="field">
+      <label>Amount (₹)</label>
+      <input type="number" id="expenseAmount" inputmode="decimal" placeholder="0">
+    </div>
+    <div class="field text">
+      <label>Note (optional)</label>
+      <input type="text" id="expenseNote" placeholder="e.g. Electricity bill">
+    </div>
+    <div class="error-msg" id="expenseError">Enter an amount greater than 0.</div>
+    <div class="sheet-actions">
+      <button id="expenseCancel">Cancel</button>
+      <button class="confirm" id="expenseConfirm">Log it</button>
+    </div>
+  </div>
+</div>
+
+<!-- Envelope Detail Sheet -->
+<div class="overlay" id="detailOverlay">
+  <div class="sheet">
+    <h3 id="detailTitle">Envelope</h3>
+    <div class="field">
+      <label>Allocate more from unallocated (₹)</label>
+      <input type="number" id="detailAllocate" inputmode="decimal" placeholder="0">
+    </div>
+    <div class="error-msg" id="detailError">Not enough unallocated money.</div>
+    <div class="envelope-detail-row">
+      <button class="confirm" id="detailAllocateConfirm">Allocate</button>
+    </div>
+    <div class="envelope-detail-row" style="margin-top:10px;">
+      <button class="danger" id="detailDelete">Delete envelope</button>
+      <button id="detailClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var STORAGE_KEY = 'flat-ledger-data-v1';
+  var state = null;
+  var dbRef = null; // set if the db capability is available; null means we fall back to localStorage
+  var writeChain = Promise.resolve();
+
+  function defaultState() {
+    return {
+      unallocated: 0,
+      categories: [],
+      transactions: []
+    };
+  }
+
+  function normalizeState(data) {
+    var cats = Array.isArray(data.categories) ? data.categories : [];
+    return {
+      unallocated: round2(typeof data.unallocated === 'number' ? data.unallocated : 0),
+      categories: cats.map(function(c) {
+        return {
+          id: c.id,
+          name: c.name,
+          allocated: round2(typeof c.allocated === 'number' ? c.allocated : 0),
+          spent: round2(typeof c.spent === 'number' ? c.spent : 0)
+        };
+      }),
+      transactions: Array.isArray(data.transactions) ? data.transactions : []
+    };
+  }
+
+  function loadLocal() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return normalizeState(JSON.parse(raw));
+    } catch (e) {
+      console.warn('Could not read saved data', e);
+    }
+    return defaultState();
+  }
+
+  function saveLocal() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      console.warn('Could not save data', e);
+    }
+  }
+
+  // Persist the current in-memory state. Uses the db capability when
+  // available (survives cache clears, syncs across devices); otherwise
+  // falls back to this browser's localStorage.
+  function persist() {
+    if (dbRef) {
+      var snapshot = JSON.parse(JSON.stringify(state));
+      writeChain = writeChain.then(function() {
+        return dbRef.set(snapshot);
+      }).catch(function(e) {
+        console.warn('Could not sync to the database, saving locally instead', e);
+        saveLocal();
+      });
+    } else {
+      saveLocal();
+    }
+  }
+
+  async function getDbRef() {
+    try {
+      if (window.claude && typeof window.claude.use === 'function') {
+        var db = await window.claude.use('db');
+        if (db) return db.doc('ledger/state');
+      }
+    } catch (e) {
+      console.warn('db capability unavailable, using local storage', e);
+    }
+    return null;
+  }
+
+  async function init() {
+    dbRef = await getDbRef();
+    if (dbRef) {
+      try {
+        var snap = await dbRef.get();
+        if (snap.exists && snap.data()) {
+          state = normalizeState(snap.data());
+        } else {
+          state = defaultState();
+          await dbRef.set(state);
+        }
+        dbRef.onSnapshot(function(s) {
+          if (s.exists && s.data() && !s.metadata.hasPendingWrites) {
+            state = normalizeState(s.data());
+            render();
+          }
+        }, function(err) {
+          console.warn('Sync error', err);
+        });
+      } catch (e) {
+        console.warn('db init failed, falling back to local storage', e);
+        dbRef = null;
+        state = loadLocal();
+      }
+    } else {
+      state = loadLocal();
+    }
+    var loadingEl = document.getElementById('loadingScreen');
+    if (loadingEl) loadingEl.classList.add('hidden');
+    render();
+  }
+
+  function fmt(n) {
+    n = Math.round(n * 100) / 100;
+    return n.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  }
+
+  // Rounds to the nearest paisa. Every monetary field is passed through this
+  // after each add/subtract so tiny binary floating-point drift (e.g. JS
+  // turning 5000 - 2500 - 2500 into 0.0000000001) never accumulates into a
+  // visible or comparison-breaking error over many transactions.
+  function round2(n) {
+    return Math.round((n + Number.EPSILON) * 100) / 100;
+  }
+
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+
+  function addTx(type, amount, title, sub) {
+    state.transactions.unshift({
+      id: uid(), type: type, amount: amount, title: title, sub: sub || '',
+      ts: new Date().toISOString()
+    });
+    if (state.transactions.length > 200) state.transactions.length = 200;
+  }
+
+  function render() {
+    var totalAllocated = 0, totalSpent = 0;
+    state.categories.forEach(function(c) {
+      totalAllocated += c.allocated;
+      totalSpent += c.spent;
+    });
+    document.getElementById('unallocatedAmt').textContent = fmt(state.unallocated);
+    document.getElementById('totalAllocated').textContent = '₹' + fmt(totalAllocated);
+    document.getElementById('totalSpent').textContent = '₹' + fmt(totalSpent);
+    // What you actually still have = unallocated + (what's allocated but not yet spent).
+    // Spent money is gone from your possession, so it must be subtracted here.
+    document.getElementById('totalIn').textContent = '₹' + fmt(state.unallocated + totalAllocated - totalSpent);
+
+    var list = document.getElementById('envelopeList');
+    list.innerHTML = '';
+    if (state.categories.length === 0) {
+      var empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.textContent = 'No envelopes yet. Create one for rent, wifi, groceries — whatever you need to track.';
+      list.appendChild(empty);
+    }
+    state.categories.forEach(function(c) {
+      var remaining = c.allocated - c.spent;
+      var pct = c.allocated > 0 ? Math.min(100, (c.spent / c.allocated) * 100) : 0;
+      var over = remaining < 0;
+      var div = document.createElement('div');
+      div.className = 'envelope';
+      div.innerHTML =
+        '<div class="envelope-top">' +
+          '<div class="name">' + escapeHtml(c.name) + '</div>' +
+          '<div class="remaining' + (over ? ' over' : '') + '">₹' + fmt(remaining) + '</div>' +
+        '</div>' +
+        '<div class="envelope-meta"><span>Spent ₹' + fmt(c.spent) + '</span><span>of ₹' + fmt(c.allocated) + '</span></div>' +
+        '<div class="bar"><div class="bar-fill' + (over ? ' over' : '') + '" style="width:' + pct + '%"></div></div>';
+      div.addEventListener('click', function() { openDetail(c.id); });
+      list.appendChild(div);
+    });
+
+    var hist = document.getElementById('historyList');
+    hist.innerHTML = '';
+    if (state.transactions.length === 0) {
+      var e2 = document.createElement('div');
+      e2.className = 'empty-state';
+      e2.textContent = 'Nothing logged yet.';
+      hist.appendChild(e2);
+    }
+    state.transactions.slice(0, 30).forEach(function(t) {
+      var row = document.createElement('div');
+      row.className = 'tx';
+      var d = new Date(t.ts);
+      var dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      var amtClass = t.type === 'income' ? 'in' : (t.type === 'expense' ? 'out' : 'move');
+      var sign = t.type === 'income' ? '+' : (t.type === 'expense' ? '−' : '');
+      row.innerHTML =
+        '<div class="tx-left"><div class="tx-title">' + escapeHtml(t.title) + '</div>' +
+        '<div class="tx-sub">' + dateStr + (t.sub ? ' · ' + escapeHtml(t.sub) : '') + '</div></div>' +
+        '<div class="tx-amt ' + amtClass + '">' + sign + '₹' + fmt(Math.abs(t.amount)) + '</div>';
+      hist.appendChild(row);
+    });
+
+    populateExpenseSelect();
+    persist();
+  }
+
+  function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function populateExpenseSelect() {
+    var sel = document.getElementById('expenseEnvelope');
+    var current = sel.value;
+    sel.innerHTML = '';
+    if (state.categories.length === 0) {
+      var opt = document.createElement('option');
+      opt.textContent = 'Create an envelope first';
+      opt.disabled = true;
+      sel.appendChild(opt);
+      return;
+    }
+    state.categories.forEach(function(c) {
+      var opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name;
+      sel.appendChild(opt);
+    });
+    if (current) sel.value = current;
+  }
+
+  function showOverlay(id) { document.getElementById(id).classList.add('show'); }
+  function hideOverlay(id) { document.getElementById(id).classList.remove('show'); }
+
+  // Add income
+  document.getElementById('openAddIncome').addEventListener('click', function() {
+    document.getElementById('incomeAmount').value = '';
+    document.getElementById('incomeNote').value = '';
+    document.getElementById('incomeError').style.display = 'none';
+    showOverlay('incomeOverlay');
+  });
+  document.getElementById('incomeCancel').addEventListener('click', function() { hideOverlay('incomeOverlay'); });
+  document.getElementById('incomeConfirm').addEventListener('click', function() {
+    var amt = parseFloat(document.getElementById('incomeAmount').value);
+    if (!amt || amt <= 0) {
+      document.getElementById('incomeError').style.display = 'block';
+      return;
+    }
+    var note = document.getElementById('incomeNote').value.trim();
+    state.unallocated = round2(state.unallocated + amt);
+    addTx('income', amt, note || 'Money added', '');
+    hideOverlay('incomeOverlay');
+    render();
+  });
+
+  // Add envelope
+  document.getElementById('openAddEnvelope').addEventListener('click', function() {
+    document.getElementById('envelopeName').value = '';
+    document.getElementById('envelopeInitial').value = '';
+    document.getElementById('envelopeError').style.display = 'none';
+    showOverlay('envelopeOverlay');
+  });
+  document.getElementById('envelopeCancel').addEventListener('click', function() { hideOverlay('envelopeOverlay'); });
+  document.getElementById('envelopeConfirm').addEventListener('click', function() {
+    var name = document.getElementById('envelopeName').value.trim();
+    var initial = parseFloat(document.getElementById('envelopeInitial').value) || 0;
+    if (!name || initial < 0 || initial > state.unallocated) {
+      document.getElementById('envelopeError').style.display = 'block';
+      return;
+    }
+    var cat = { id: uid(), name: name, allocated: round2(initial), spent: 0 };
+    state.categories.push(cat);
+    state.unallocated = round2(state.unallocated - initial);
+    if (initial > 0) addTx('allocate', initial, 'Allocated to ' + name, '');
+    hideOverlay('envelopeOverlay');
+    render();
+  });
+
+  // Log expense
+  document.getElementById('openLogExpense').addEventListener('click', function() {
+    document.getElementById('expenseAmount').value = '';
+    document.getElementById('expenseNote').value = '';
+    document.getElementById('expenseError').style.display = 'none';
+    populateExpenseSelect();
+    showOverlay('expenseOverlay');
+  });
+  document.getElementById('expenseCancel').addEventListener('click', function() { hideOverlay('expenseOverlay'); });
+  document.getElementById('expenseConfirm').addEventListener('click', function() {
+    var catId = document.getElementById('expenseEnvelope').value;
+    var amt = parseFloat(document.getElementById('expenseAmount').value);
+    var cat = state.categories.filter(function(c) { return c.id === catId; })[0];
+    if (!cat || !amt || amt <= 0) {
+      document.getElementById('expenseError').style.display = 'block';
+      return;
+    }
+    var note = document.getElementById('expenseNote').value.trim();
+    cat.spent = round2(cat.spent + amt);
+    addTx('expense', amt, note || ('Spent from ' + cat.name), cat.name);
+    hideOverlay('expenseOverlay');
+    render();
+  });
+
+  // Envelope detail
+  var activeDetailId = null;
+  function openDetail(id) {
+    activeDetailId = id;
+    var cat = state.categories.filter(function(c) { return c.id === id; })[0];
+    if (!cat) return;
+    document.getElementById('detailTitle').textContent = cat.name;
+    document.getElementById('detailAllocate').value = '';
+    document.getElementById('detailError').style.display = 'none';
+    showOverlay('detailOverlay');
+  }
+  document.getElementById('detailClose').addEventListener('click', function() { hideOverlay('detailOverlay'); });
+  document.getElementById('detailAllocateConfirm').addEventListener('click', function() {
+    var cat = state.categories.filter(function(c) { return c.id === activeDetailId; })[0];
+    var amt = parseFloat(document.getElementById('detailAllocate').value);
+    if (!cat || !amt || amt <= 0 || amt > state.unallocated) {
+      document.getElementById('detailError').style.display = 'block';
+      return;
+    }
+    cat.allocated = round2(cat.allocated + amt);
+    state.unallocated = round2(state.unallocated - amt);
+    addTx('allocate', amt, 'Allocated to ' + cat.name, '');
+    hideOverlay('detailOverlay');
+    render();
+  });
+  document.getElementById('detailDelete').addEventListener('click', function() {
+    var cat = state.categories.filter(function(c) { return c.id === activeDetailId; })[0];
+    if (!cat) return;
+    if (!confirm('Delete "' + cat.name + '"? Its remaining balance goes back to unallocated.')) return;
+    var remaining = round2(cat.allocated - cat.spent);
+    state.unallocated = round2(state.unallocated + remaining);
+    state.categories = state.categories.filter(function(c) { return c.id !== activeDetailId; });
+    addTx('move', remaining, 'Deleted ' + cat.name, 'Balance returned');
+    hideOverlay('detailOverlay');
+    render();
+  });
+
+  // Reset
+  document.getElementById('resetBtn').addEventListener('click', function() {
+    if (!confirm('Clear all data and start over? This cannot be undone.')) return;
+    state = defaultState();
+    render();
+  });
+
+  // Close overlays on backdrop click
+  document.querySelectorAll('.overlay').forEach(function(ov) {
+    ov.addEventListener('click', function(e) {
+      if (e.target === ov) ov.classList.remove('show');
+    });
+  });
+
+  init();
+})();
+</script>
+</body>
+</html>
