@@ -127,9 +127,13 @@ New button (e.g. next to "Reset" in the header) — "Export CSV".
 Flow:
 1. `Storage.getAllTransactionsForExport()` returns every transaction row.
 2. Build a CSV string client-side: header row
-   `Date,Type,Title,Note,Envelope,Amount`, one row per transaction, amounts
-   as plain numbers (no currency symbol, so it opens cleanly in
-   Sheets/Excel).
+   `Date,Type,Title,Note,Amount` (no separate `Envelope` column — a
+   transaction's `sub` field already carries the envelope name at
+   write-time for expenses, the same way the original app's transaction
+   list did; a live join on `envelope_id` would break once an envelope is
+   deleted, since transactions predate the envelope's deletion), one row
+   per transaction, amounts as plain numbers (no currency symbol, so it
+   opens cleanly in Sheets/Excel).
 3. Write it to a temp file via `@capacitor/filesystem`
    (`Directory.Cache`, e.g. `flat-ledger-export-<timestamp>.csv`).
 4. Invoke `@capacitor/share`'s `Share.share()` with that file URI, which
