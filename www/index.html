@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flat Ledger</title>
+<meta name="theme-color" content="#2F6F4E">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="loadingScreen">Loading your ledger…</div>
+<div id="fatalError" class="fatal-error hidden">
+  <div class="fatal-error-title">Couldn't load your data</div>
+  <div class="fatal-error-detail" id="fatalErrorDetail"></div>
+</div>
+<div class="app">
+  <header class="top">
+    <h1>Flat Ledger</h1>
+    <div class="header-actions">
+      <button class="icon-btn" id="exportBtn">Export</button>
+      <button class="icon-btn" id="resetBtn">Reset</button>
+    </div>
+  </header>
+  <div id="exportStatus" class="export-status hidden"></div>
+
+  <div class="passbook">
+    <div class="label">Unallocated</div>
+    <div class="amount"><span class="rupee">₹</span><span id="unallocatedAmt">0</span></div>
+    <div class="sub">
+      <div>
+        <div class="k">Allocated</div>
+        <div class="v" id="totalAllocated">₹0</div>
+      </div>
+      <div>
+        <div class="k">Spent</div>
+        <div class="v" id="totalSpent">₹0</div>
+      </div>
+      <div>
+        <div class="k">Remaining overall</div>
+        <div class="v" id="totalIn">₹0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions-row">
+    <button class="primary" id="openAddIncome">+ Add money</button>
+    <button id="openLogExpense">Log expense</button>
+  </div>
+
+  <section class="envelopes">
+    <h2>Envelopes</h2>
+    <div id="envelopeList"></div>
+    <button class="add-envelope-btn" id="openAddEnvelope">+ New envelope</button>
+  </section>
+
+  <section class="history">
+    <h2>Recent activity</h2>
+    <div id="historyList"></div>
+  </section>
+</div>
+
+<!-- Add Income Sheet -->
+<div class="overlay" id="incomeOverlay">
+  <div class="sheet">
+    <h3>Add money</h3>
+    <div class="field">
+      <label>Amount (₹)</label>
+      <input type="number" id="incomeAmount" inputmode="decimal" placeholder="0">
+    </div>
+    <div class="field text">
+      <label>Note (optional)</label>
+      <input type="text" id="incomeNote" placeholder="e.g. Monthly allowance">
+    </div>
+    <div class="error-msg" id="incomeError">Enter an amount greater than 0.</div>
+    <div class="sheet-actions">
+      <button id="incomeCancel">Cancel</button>
+      <button class="confirm" id="incomeConfirm">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Envelope Sheet -->
+<div class="overlay" id="envelopeOverlay">
+  <div class="sheet">
+    <h3>New envelope</h3>
+    <div class="field text">
+      <label>Name</label>
+      <input type="text" id="envelopeName" placeholder="e.g. Rent, Wifi, Groceries">
+    </div>
+    <div class="field">
+      <label>Allocate now (optional, ₹)</label>
+      <input type="number" id="envelopeInitial" inputmode="decimal" placeholder="0">
+    </div>
+    <div class="error-msg" id="envelopeError">Give it a name, and don't allocate more than you have unallocated.</div>
+    <div class="sheet-actions">
+      <button id="envelopeCancel">Cancel</button>
+      <button class="confirm" id="envelopeConfirm">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Log Expense Sheet -->
+<div class="overlay" id="expenseOverlay">
+  <div class="sheet">
+    <h3>Log expense</h3>
+    <div class="field text">
+      <label>Envelope</label>
+      <select id="expenseEnvelope"></select>
+    </div>
+    <div class="field">
+      <label>Amount (₹)</label>
+      <input type="number" id="expenseAmount" inputmode="decimal" placeholder="0">
+    </div>
+    <div class="field text">
+      <label>Note (optional)</label>
+      <input type="text" id="expenseNote" placeholder="e.g. Electricity bill">
+    </div>
+    <div class="error-msg" id="expenseError">Enter an amount greater than 0.</div>
+    <div class="sheet-actions">
+      <button id="expenseCancel">Cancel</button>
+      <button class="confirm" id="expenseConfirm">Log it</button>
+    </div>
+  </div>
+</div>
+
+<!-- Envelope Detail Sheet -->
+<div class="overlay" id="detailOverlay">
+  <div class="sheet">
+    <h3 id="detailTitle">Envelope</h3>
+    <div class="field">
+      <label>Allocate more from unallocated (₹)</label>
+      <input type="number" id="detailAllocate" inputmode="decimal" placeholder="0">
+    </div>
+    <div class="error-msg" id="detailError">Not enough unallocated money.</div>
+    <div class="envelope-detail-row">
+      <button class="confirm" id="detailAllocateConfirm">Allocate</button>
+    </div>
+    <div class="envelope-detail-row" style="margin-top:10px;">
+      <button class="danger" id="detailDelete">Delete envelope</button>
+      <button id="detailClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="dist/bundle.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "appId": "com.flatledger.app",
+  "appName": "Flat Ledger",
+  "webDir": "www",
+  "plugins": {
+    "CapacitorSQLite": {
+      "androidIsEncryption": false
+    }
+  }
+}
